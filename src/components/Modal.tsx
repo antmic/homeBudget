@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import './Modal.css';
 
 interface ModalProps {
@@ -8,6 +8,23 @@ interface ModalProps {
 }
 
 const Modal: React.FC<ModalProps> = ({ show, onClose, children }) => {
+
+	useEffect(() => {
+		const handleKeyDown = (event: KeyboardEvent) => {
+			if (event.key === 'Escape') {
+				onClose();
+			}
+		};
+
+		if (show) {
+			document.addEventListener('keydown', handleKeyDown);
+		}
+
+		return () => {
+			document.removeEventListener('keydown', handleKeyDown);
+		};
+	}, [show, onClose]);
+
 	if (!show) {
 		return null;
 	}

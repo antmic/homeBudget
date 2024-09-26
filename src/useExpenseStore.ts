@@ -4,7 +4,7 @@ import { persist } from 'zustand/middleware';
 export type Expense = {
 	id: number;
 	description: string;
-	amount: number | string;
+	amount: string;
 	date: string;
 	comment?: string;
 };

@@ -1,100 +1,153 @@
-import React from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useExpenseStore, Expense } from '../useExpenseStore';
 import Modal from './Modal';
-import useExpenseForm from '../hooks/useExpenseForm';
+import { validateMoney } from '../lib/validation';
 
 interface ExpenseFormProps {
-	expense?: Expense['id'] | undefined;
+	expenseId?: Expense['id'] | undefined;
 	action?: 'edit' | 'copy';
 }
 
-const ExpenseForm: React.FC<ExpenseFormProps> = ({ expense, action }) => {
+const ExpenseForm: React.FC<ExpenseFormProps> = ({ expenseId, action }) => {
 	const addExpense = useExpenseStore(state => state.addExpense);
 	const updateExpense = useExpenseStore(state => state.updateExpense);
+	const expenses = useExpenseStore(state => state.expenses);
+	const [description, setDescription] = useState('');
+	const [amount, setAmount] = useState('');
+	const [date, setDate] = useState('');
+	const [showModal, setShowModal] = useState(false);
+	const [buttonDisabled, setButtonDisabled] = useState(true);
+	const descriptionInputRef = useRef<HTMLInputElement>(null);
 
-	const {
-		description,
-		setDescription,
-		amount,
-		setAmount,
-		date,
-		setDate,
-		showModal,
-		handleOpenModal,
-		handleCloseModal,
-	} = useExpenseForm(expense);
-
-	const handleAddExpense = () => {
+	const handleAddExpense = useCallback(() => {
 		const newExpense: Expense = {
 			id: Date.now(),
 			description,
-			amount: typeof amount === 'string' ? parseFloat(amount) : amount,
+			amount: amount,
 			date,
 		};
 		addExpense(newExpense);
-		handleCloseModal();
-	};
+		setShowModal(false);
+	}, [description, amount, date, addExpense]);
 
-	const handleEditExpense = () => {
+	const handleEditExpense = useCallback(() => {
 		const updatedExpense: Expense = {
-			id: expense!,
+			id: expenseId!,
 			description,
-			amount: typeof amount === 'string' ? parseFloat(amount) : amount,
+			amount: amount,
 			date,
 		};
-		updateExpense(expense!, updatedExpense);
-		handleCloseModal();
-	};
+		updateExpense(expenseId!, updatedExpense);
+		setShowModal(false);
+	}, [description, amount, date, expenseId, updateExpense]);
 
-	const handleCopyExpense = () => {
+	const handleCopyExpense = useCallback(() => {
 		const newExpense: Expense = {
 			id: Date.now(),
 			description,
-			amount: typeof amount === 'string' ? parseFloat(amount) : amount,
+			amount: amount,
 			date,
 		};
 		addExpense(newExpense);
-		handleCloseModal();
-	};
+		setShowModal(false);
+	}, [description, amount, date, addExpense]);
 
-	let handleExpense;
-	let buttonText;
-	switch (action) {
-		case 'edit': {
-			handleExpense = handleEditExpense;
-			buttonText = 'Edit';
-			break;
+	const { handleExpense, buttonText } = useMemo(() => {
+		let handleExpense: () => void;
+		let buttonText: string;
+
+		switch (action) {
+			case 'edit': {
+				handleExpense = handleEditExpense;
+				buttonText = 'Edit';
+				break;
+			}
+			case 'copy': {
+				handleExpense = handleCopyExpense;
+				buttonText = 'Copy and edit';
+				break;
+			}
+			default: {
+				handleExpense = handleAddExpense;
+				buttonText = 'Add expense';
+				break;
+			}
 		}
-		case 'copy': {
-			handleExpense = handleCopyExpense;
-			buttonText = 'Copy and edit';
-			break;
+
+		return { handleExpense, buttonText };
+	}, [action, handleAddExpense, handleEditExpense, handleCopyExpense]);
+
+	useEffect(() => {
+		const handleKeyDown = (event: KeyboardEvent) => {
+			if (event.key === 'Enter' && !buttonDisabled) {
+				handleExpense();
+			}
+		};
+
+		if (showModal) {
+			document.addEventListener('keydown', handleKeyDown);
 		}
-		default: {
-			handleExpense = handleAddExpense;
-			buttonText = 'Add expense';
-			break;
+
+		return () => {
+			document.removeEventListener('keydown', handleKeyDown);
+		};
+	}, [showModal, buttonDisabled, handleExpense]);
+
+	useEffect(() => {
+		if (showModal && descriptionInputRef.current) {
+			descriptionInputRef.current.focus();
 		}
-	}
+	}, [showModal]);
+
+	useEffect(() => {
+		if (expenseId) {
+			const currentExpense = expenses.find(exp => exp.id === expenseId);
+			if (currentExpense) {
+				setDescription(currentExpense.description);
+				setAmount(currentExpense.amount);
+				setDate(currentExpense.date);
+			}
+		} else {
+			setDescription('');
+			setAmount('');
+			setDate('');
+		}
+	}, [expenseId, expenses, showModal]);
+
+	useEffect(() => {
+		if (buttonDisabled && description && amount && date) {
+			setButtonDisabled(false);
+		} else if (!buttonDisabled && (!description || !amount || !date)) {
+			setButtonDisabled(true);
+		}
+	}, [description, amount, date, buttonDisabled]);
 
 	return (
 		<div>
-			<button onClick={handleOpenModal}>{buttonText}</button>
-			<Modal show={showModal} onClose={handleCloseModal}>
+			<button onClick={() => setShowModal(true)}>{buttonText}</button>
+			<Modal show={showModal} onClose={() => setShowModal(false)}>
 				<input
 					type='text'
 					placeholder='Description'
 					value={description}
 					onChange={e => setDescription(e.target.value)}
+					ref={descriptionInputRef}
 				/>
 				<input
-					type='number'
 					placeholder='Amount'
 					value={amount}
-					onChange={e => setAmount(e.target.value === '' ? '' : Number(e.target.value))}
+					// onBlur is used to handle the case when the user enters '0.' and then clicks outside the input as it cannot be handled by the onChange event
+					onChange={e => setAmount(validateMoney(e.target.value))}
+					onBlur={e => {
+						if (e.target.value === '0.') {
+							setAmount('0');
+						}
+					}}
 				/>
 				<input type='date' value={date} onChange={e => setDate(e.target.value)} />
-				<button onClick={handleExpense}>Save</button>
+				<button disabled={buttonDisabled} onClick={handleExpense}>
+					Save
+				</button>
 			</Modal>
 		</div>
 	);

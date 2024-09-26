@@ -5,7 +5,7 @@ const useExpenseForm = (expenseId: Expense['id'] | undefined) => {
 	const expenses = useExpenseStore(state => state.expenses);
 
 	const [description, setDescription] = useState('');
-	const [amount, setAmount] = useState<string | number>('');
+	const [amount, setAmount] = useState('');
 	const [date, setDate] = useState('');
 	const [showModal, setShowModal] = useState(false);
 

@@ -28,8 +28,8 @@ function App() {
 								<td>{expense.date}</td>
 								<td>
 									<RemoveExpense expense={expense} />
-									<ExpenseForm expense={expense.id} action='edit' />
-									<ExpenseForm expense={expense.id} action='copy' />
+									<ExpenseForm expenseId={expense.id} action='edit' />
+									<ExpenseForm expenseId={expense.id} action='copy' />
 								</td>
 							</tr>
 						))}
