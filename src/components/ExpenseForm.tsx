@@ -115,12 +115,12 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ expenseId, action }) => {
 	}, [expenseId, expenses, showModal]);
 
 	useEffect(() => {
-		if (buttonDisabled && description && amount && date) {
+		if (description && amount && date) {
 			setButtonDisabled(false);
-		} else if (!buttonDisabled && (!description || !amount || !date)) {
+		} else {
 			setButtonDisabled(true);
 		}
-	}, [description, amount, date, buttonDisabled]);
+	}, [description, amount, date]);
 
 	return (
 		<div>
