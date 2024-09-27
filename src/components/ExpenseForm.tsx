@@ -1,154 +1,105 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useEffect, useRef, useCallback, useMemo } from 'react';
 import { useExpenseStore, Expense } from '../useExpenseStore';
-import Modal from './Modal';
 import { validateMoney } from '../lib/validation';
+import useFormState from '../hooks/useFormState';
+import './Modal.css';
 
 interface ExpenseFormProps {
 	expenseId?: Expense['id'] | undefined;
 	action?: 'edit' | 'copy';
+	onClose: () => void;
 }
 
-const ExpenseForm: React.FC<ExpenseFormProps> = ({ expenseId, action }) => {
+const ExpenseForm: React.FC<ExpenseFormProps> = ({ expenseId, action, onClose }) => {
 	const addExpense = useExpenseStore(state => state.addExpense);
 	const updateExpense = useExpenseStore(state => state.updateExpense);
-	const expenses = useExpenseStore(state => state.expenses);
-	const [description, setDescription] = useState('');
-	const [amount, setAmount] = useState('');
-	const [date, setDate] = useState('');
-	const [showModal, setShowModal] = useState(false);
-	const [buttonDisabled, setButtonDisabled] = useState(true);
+	const [formState, setFormState] = useFormState(expenseId);
 	const descriptionInputRef = useRef<HTMLInputElement>(null);
 
-	const handleAddExpense = useCallback(() => {
-		const newExpense: Expense = {
-			id: Date.now(),
-			description,
-			amount: amount,
-			date,
+	// count the number of times the component renders and log it to the console
+	const renderCount = useRef(0);
+	console.log('ExpenseForm rendered', renderCount.current++);
+
+	const handleExpense = useCallback(() => {
+		const expense: Expense = {
+			id: action === 'edit' ? expenseId! : Date.now(),
+			...formState,
 		};
-		addExpense(newExpense);
-		setShowModal(false);
-	}, [description, amount, date, addExpense]);
 
-	const handleEditExpense = useCallback(() => {
-		const updatedExpense: Expense = {
-			id: expenseId!,
-			description,
-			amount: amount,
-			date,
-		};
-		updateExpense(expenseId!, updatedExpense);
-		setShowModal(false);
-	}, [description, amount, date, expenseId, updateExpense]);
-
-	const handleCopyExpense = useCallback(() => {
-		const newExpense: Expense = {
-			id: Date.now(),
-			description,
-			amount: amount,
-			date,
-		};
-		addExpense(newExpense);
-		setShowModal(false);
-	}, [description, amount, date, addExpense]);
-
-	const { handleExpense, buttonText } = useMemo(() => {
-		let handleExpense: () => void;
-		let buttonText: string;
-
-		switch (action) {
-			case 'edit': {
-				handleExpense = handleEditExpense;
-				buttonText = 'Edit';
-				break;
-			}
-			case 'copy': {
-				handleExpense = handleCopyExpense;
-				buttonText = 'Copy and edit';
-				break;
-			}
-			default: {
-				handleExpense = handleAddExpense;
-				buttonText = 'Add expense';
-				break;
-			}
+		if (action === 'edit') {
+			updateExpense(expenseId!, expense);
+		} else {
+			addExpense(expense);
 		}
 
-		return { handleExpense, buttonText };
-	}, [action, handleAddExpense, handleEditExpense, handleCopyExpense]);
+		onClose();
+	}, [action, expenseId, formState, onClose, updateExpense, addExpense]);
+
+	useEffect(() => {
+		if (descriptionInputRef.current) {
+			descriptionInputRef.current.focus();
+		}
+	}, []);
+
+	const isButtonDisabled = useMemo(() => {
+		const { description, amount, date } = formState;
+		return !(description && amount && date);
+	}, [formState]);
+
+	const handleChange = useCallback(
+		(e: React.ChangeEvent<HTMLInputElement>) => {
+			const { name, value } = e.target;
+			setFormState(prevState => ({
+				...prevState,
+				[name]: name === 'amount' ? validateMoney(value) : value,
+			}));
+		},
+		[setFormState]
+	);
 
 	useEffect(() => {
 		const handleKeyDown = (event: KeyboardEvent) => {
-			if (event.key === 'Enter' && !buttonDisabled) {
+			if (event.key === 'Enter' && !isButtonDisabled) {
 				handleExpense();
 			}
 		};
-
-		if (showModal) {
-			document.addEventListener('keydown', handleKeyDown);
-		}
+		document.addEventListener('keydown', handleKeyDown);
 
 		return () => {
 			document.removeEventListener('keydown', handleKeyDown);
 		};
-	}, [showModal, buttonDisabled, handleExpense]);
-
-	useEffect(() => {
-		if (showModal && descriptionInputRef.current) {
-			descriptionInputRef.current.focus();
-		}
-	}, [showModal]);
-
-	useEffect(() => {
-		if (expenseId) {
-			const currentExpense = expenses.find(exp => exp.id === expenseId);
-			if (currentExpense) {
-				setDescription(currentExpense.description);
-				setAmount(currentExpense.amount);
-				setDate(currentExpense.date);
-			}
-		} else {
-			setDescription('');
-			setAmount('');
-			setDate('');
-		}
-	}, [expenseId, expenses, showModal]);
-
-	useEffect(() => {
-		if (description && amount && date) {
-			setButtonDisabled(false);
-		} else {
-			setButtonDisabled(true);
-		}
-	}, [description, amount, date]);
+	}, [isButtonDisabled, handleExpense]);
 
 	return (
-		<div>
-			<button onClick={() => setShowModal(true)}>{buttonText}</button>
-			<Modal show={showModal} onClose={() => setShowModal(false)}>
+		<div className='modal-overlay'>
+			<div className='modal-content'>
 				<input
 					type='text'
+					name='description'
 					placeholder='Description'
-					value={description}
-					onChange={e => setDescription(e.target.value)}
+					value={formState.description}
+					onChange={handleChange}
 					ref={descriptionInputRef}
 				/>
 				<input
+					name='amount'
 					placeholder='Amount'
-					value={amount}
-					// onBlur is used to handle the case when the user enters '0.' and then clicks outside the input as it cannot be handled by the onChange event
-					onChange={e => setAmount(validateMoney(e.target.value))}
+					value={formState.amount}
+					onChange={handleChange}
 					onBlur={e => {
 						if (e.target.value === '0.') {
-							setAmount('0');
+							setFormState(prevState => ({ ...prevState, amount: '0' }));
 						}
 					}}
 				/>
-				<input type='date' value={date} onChange={e => setDate(e.target.value)} />
-				<button disabled={buttonDisabled} onClick={handleExpense}>
+				<input type='date' name='date' value={formState.date} onChange={handleChange} />
+				<button disabled={isButtonDisabled} onClick={handleExpense}>
 					Save
 				</button>
-			</Modal>
+				<button className='close-button' onClick={onClose}>
+					X
+				</button>
+			</div>
 		</div>
 	);
 };
