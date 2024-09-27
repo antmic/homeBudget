@@ -22,7 +22,7 @@ const RemoveExpense: React.FC<RemoveExpenseProps> = ({ expense, onClose }) => {
 					Remove
 				</button>
 				<button className='close-button' onClick={onClose}>
-					X
+					x
 				</button>
 			</div>
 		</div>

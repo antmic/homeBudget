@@ -97,7 +97,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ expenseId, action, onClose })
 					Save
 				</button>
 				<button className='close-button' onClick={onClose}>
-					X
+					x
 				</button>
 			</div>
 		</div>
